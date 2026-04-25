@@ -143,11 +143,34 @@ static int ensure_district(void)
     return 0;
 }
 
+static void check_symlink(void)
+{
+    char link[256], target[256];
+    snprintf(link,   sizeof(link),   "active_reports-%s", g_district);
+    snprintf(target, sizeof(target), "%s/%s", g_district, REPORTS_FILE);
+
+    struct stat lst;
+    /* lstat() verifica link-ul insusi, nu urmareste catre tinta */
+    if (lstat(link, &lst) != 0)
+        return; /* link-ul nu exista inca, nimic de verificat */
+
+    if (!S_ISLNK(lst.st_mode))
+        return; /* nu e symlink */
+
+    /* stat() urmareste link-ul catre tinta – daca esueaza, e dangling */
+    struct stat st;
+    if (stat(link, &st) < 0)
+        fprintf(stderr, "WARNING: symlink '%s' -> '%s' is dangling (target does not exist)\n",
+                link, target);
+}
+
 static void update_symlink(void)
 {
     char link[256], target[256];
     snprintf(link,   sizeof(link),   "active_reports-%s", g_district);
     snprintf(target, sizeof(target), "%s/%s", g_district, REPORTS_FILE);
+
+    /* lstat() pentru a verifica link-ul in sine, nu tinta lui */
     struct stat lst;
     if (lstat(link, &lst) == 0) unlink(link);
     if (symlink(target, link) < 0) perror("symlink");
@@ -212,6 +235,9 @@ static void cmd_add(void)
 
 static void cmd_list(void)
 {
+    /* Raporteaza dangling symlink inainte de orice altceva */
+    check_symlink();
+
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
     if (check_access(path, 1, 0) < 0) return;
@@ -281,8 +307,7 @@ static void cmd_view(void)
             printf("Timestamp   : %s\n",             ts);
             printf("Description : %s\n",             r.description);
             printf("===================================\n");
-            close(fd); log_action("view");
-            return;
+            close(fd); log_action("view"); return;
         }
     }
     close(fd);
@@ -293,8 +318,7 @@ static void cmd_remove_report(void)
 {
     if (strcmp(g_role, "manager") != 0)
     {
-        fprintf(stderr, "Permission denied: manager only.\n"); 
-		return;
+        fprintf(stderr, "Permission denied: manager only.\n"); return;
     }
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
@@ -354,7 +378,7 @@ static void cmd_update_threshold(void)
     if (strcmp(g_role, "manager") != 0)
     {
         fprintf(stderr, "Permission denied: manager only.\n");
-        return;
+	return;
     }
 
     char path[256];
@@ -396,15 +420,12 @@ static void cmd_update_threshold(void)
 //AI-assisted implementation
 int parse_condition(const char *input, char *field, char *op, char *value) {
     const char *p1 = strchr(input, ':');
-    if (!p1)
-		return -1;
+    if (!p1) return -1;
 
     const char *p2 = strchr(p1 + 1, ':');
-    if (!p2) 
-		return -1;
+    if (!p2) return -1;
 
-    if (p1 == input || p2 == p1 + 1) 
-		return -1;
+    if (p1 == input || p2 == p1 + 1) return -1;
 
     strncpy(field, input,    p1 - input);
     field[p1 - input] = '\0';
