@@ -28,7 +28,7 @@ typedef struct {
     char     description[DESC_LEN];
 } __attribute__((packed)) Report;
 
-//CLI state 
+//CLI state
 static char  g_role[20];
 static char  g_user[20];
 static char  g_op[24];
@@ -39,17 +39,17 @@ static char  g_conds[10][64];
 static int   g_nconds;
 
 /* permisiuninile binare */
-static void mode_to_str(mode_t m, char out[10]) 
+static void mode_to_str(mode_t m, char out[10])
 {
-    out[0] = (m & S_IRUSR) ? 'r' : '-';  
+    out[0] = (m & S_IRUSR) ? 'r' : '-';
     out[1] = (m & S_IWUSR) ? 'w' : '-';
-    out[2] = (m & S_IXUSR) ? 'x' : '-';  
+    out[2] = (m & S_IXUSR) ? 'x' : '-';
     out[3] = (m & S_IRGRP) ? 'r' : '-';
-    out[4] = (m & S_IWGRP) ? 'w' : '-';  
+    out[4] = (m & S_IWGRP) ? 'w' : '-';
     out[5] = (m & S_IXGRP) ? 'x' : '-';
-    out[6] = (m & S_IROTH) ? 'r' : '-';  
+    out[6] = (m & S_IROTH) ? 'r' : '-';
     out[7] = (m & S_IWOTH) ? 'w' : '-';
-    out[8] = (m & S_IXOTH) ? 'x' : '-';  
+    out[8] = (m & S_IXOTH) ? 'x' : '-';
     out[9] = '\0';
 }
 
@@ -57,19 +57,19 @@ static void mode_to_str(mode_t m, char out[10])
  Acces Role-based  (manager = owner bits, inspector = group bits).
  Returneaza 0 daca are voie, -1 daca nu.
  */
- 
+
 static int check_access(const char *path, int need_read, int need_write) {
     struct stat st;
-    if (stat(path, &st) < 0) 
+    if (stat(path, &st) < 0)
         return 0;  //inca nu e creat fisierul
     mode_t m = st.st_mode;
     int ok = 1;
-    if (strcmp(g_role, "manager") == 0) 
+    if (strcmp(g_role, "manager") == 0)
     {
         if (need_read  && !(m & S_IRUSR)) ok = 0;
         if (need_write && !(m & S_IWUSR)) ok = 0;
     }
-    else 
+    else
     {
         if (need_read  && !(m & S_IRGRP)) ok = 0;
         if (need_write && !(m & S_IWGRP)) ok = 0;
@@ -89,7 +89,7 @@ static void log_action(const char *action)
 
     struct stat st;
     if (stat(path, &st) == 0 && strcmp(g_role, "inspector") == 0 && !(st.st_mode & S_IWGRP))
-        return;  
+        return;
 
     int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (fd < 0)
@@ -99,13 +99,13 @@ static void log_action(const char *action)
     char ts[32], line[256];
     time_t now = time(NULL);
     strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", localtime(&now));
-    
+
     int n = snprintf(line, sizeof(line),"[%s] role=%s user=%s action=%s\n", ts, g_role, g_user, action);
     write(fd, line, n);
     close(fd);
 }
 
-static int ensure_district(void) 
+static int ensure_district(void)
 {
     struct stat st;
     if (stat(g_district, &st) < 0)
@@ -117,7 +117,7 @@ static int ensure_district(void)
 	}
         chmod(g_district, 0750);
     }
-    
+
     char p[256];
     snprintf(p, sizeof(p), "%s/%s", g_district, CONFIG_FILE);
     if (stat(p, &st) < 0)
@@ -132,7 +132,7 @@ static int ensure_district(void)
         close(fd);
         chmod(p, 0640);
     }
-    
+
     snprintf(p, sizeof(p), "%s/%s", g_district, LOG_FILE);
     if (stat(p, &st) < 0)
     {
@@ -210,7 +210,7 @@ static void cmd_add(void)
     printf("Report #%u added to district '%s'.\n", r.id, g_district);
 }
 
-static void cmd_list(void) 
+static void cmd_list(void)
 {
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
@@ -240,7 +240,7 @@ static void cmd_list(void)
     {
         time_t _t = r.timestamp;
         strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", localtime(&_t));
-	
+
         printf("ID:%-4u | %-20s | %-12s | Sev:%u | %s\n",
                r.id, r.inspector, r.category, r.severity, ts);
         n++;
@@ -251,7 +251,7 @@ static void cmd_list(void)
     log_action("list");
 }
 
-static void cmd_view(void) 
+static void cmd_view(void)
 {
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
@@ -266,7 +266,7 @@ static void cmd_view(void)
     }
 
     Report r;
-    while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r)) 
+    while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
     {
         if (r.id == tid)
 	{
@@ -281,18 +281,20 @@ static void cmd_view(void)
             printf("Timestamp   : %s\n",             ts);
             printf("Description : %s\n",             r.description);
             printf("===================================\n");
-            close(fd); log_action("view"); return;
+            close(fd); log_action("view");
+            return;
         }
     }
     close(fd);
     printf("Report #%u not found in '%s'.\n", tid, g_district);
 }
 
-static void cmd_remove_report(void) 
+static void cmd_remove_report(void)
 {
     if (strcmp(g_role, "manager") != 0)
     {
-        fprintf(stderr, "Permission denied: manager only.\n"); return;
+        fprintf(stderr, "Permission denied: manager only.\n"); 
+		return;
     }
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
@@ -347,14 +349,14 @@ static void cmd_remove_report(void)
     printf("Report #%u removed from '%s'.\n", tid, g_district);
 }
 
-static void cmd_update_threshold(void) 
+static void cmd_update_threshold(void)
 {
     if (strcmp(g_role, "manager") != 0)
     {
         fprintf(stderr, "Permission denied: manager only.\n");
-	return;
+        return;
     }
-    
+
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, CONFIG_FILE);
 
@@ -381,7 +383,7 @@ static void cmd_update_threshold(void)
       perror("open cfg");
       return;
     }
-    
+
     char buf[64];
     int len = snprintf(buf, sizeof(buf), "threshold=%d\n", g_value);
     write(fd, buf, len);
@@ -391,81 +393,140 @@ static void cmd_update_threshold(void)
     printf("Threshold updated to %d in '%s'.\n", g_value, g_district);
 }
 
-//AI implementation
-int parse_condition(const char *input, char *field, char *op, char *value)
-{
-  const char *p1=strchr(input,':');
-  if(!p1)
-    return -1;
+//AI-assisted implementation
+int parse_condition(const char *input, char *field, char *op, char *value) {
+    const char *p1 = strchr(input, ':');
+    if (!p1)
+		return -1;
 
-  const char *p2=strchr(p1+1,':');
-  if(!p2)
-    return -1;
+    const char *p2 = strchr(p1 + 1, ':');
+    if (!p2) 
+		return -1;
 
-  strncpy(field, input,p1-input);
-  field[p1-input]='\0';
+    if (p1 == input || p2 == p1 + 1) 
+		return -1;
 
-  strncpy(op,p1+1,p2-p1-1);
-  op[p2-p1-1]='\0';
+    strncpy(field, input,    p1 - input);
+    field[p1 - input] = '\0';
 
-  strcpy(value,p2+1);
-  return 0;
+    strncpy(op, p1 + 1, p2 - p1 - 1);
+    op[p2 - p1 - 1] = '\0';
+
+    strcpy(value, p2 + 1);
+
+    if (strcmp(op,"==") != 0 && strcmp(op,"!=") != 0 &&
+        strcmp(op,"<")  != 0 && strcmp(op,"<=") != 0 &&
+        strcmp(op,">")  != 0 && strcmp(op,">=") != 0)
+        return -1;
+
+    if (strcmp(field,"severity")  != 0 && strcmp(field,"category") != 0 &&
+        strcmp(field,"inspector") != 0 && strcmp(field,"timestamp") != 0)
+        return -1;
+
+    return 0;
 }
 
-int match_condition(Report *r, const char *field, const char *op, const char *value)
-{
-  if(strcmp(field, "severity")==0 || strcmp(field, "timestamp")==0)
-  {
-    long rv=(strcmp(field,"severity")==0)?(long)r->severity:(long)r->timestamp;
-    long lv=atol(value);
-    if(strcmp(op,"==")==0)
-      return rv==lv;
-    if(strcmp(op,"!=")==0)
-      return rv!=lv;
-    if(strcmp(op,"<")==0)
-      return rv<lv;
-    if(strcmp(op,"<=")==0)
-      return rv<=lv;
-    if(strcmp(op,">")==0)
-      return rv>lv;
-    if(strcmp(op,">=")==0)
-      return rv>=lv;
-  }
-  
-  if(strcmp(field,"category")==0 || strcmp(field,"inspector")==0)
-  {
-    const char *rv=(strcmp(field,"category")==0)?r->category:r->inspector;
-    int cmp=strcmp(rv,value);
-    if(strcmp(op,"==")==0)
-      return cmp==0;
-    if(strcmp(op,"!=")==0)
-      return cmp!=0;
-  }
-  
-  return 0;
+
+int match_condition(Report *r, const char *field, const char *op, const char *value) {
+    /* ── Numeric fields ── */
+    if (strcmp(field, "severity") == 0 || strcmp(field, "timestamp") == 0) {
+        long rv = (strcmp(field, "severity") == 0) ? (long)r->severity : (long)r->timestamp;
+        long lv = atol(value);
+
+        if (strcmp(op, "==") == 0)
+                return rv == lv;
+        if (strcmp(op, "!=") == 0)
+                return rv != lv;
+        if (strcmp(op, "<")  == 0)
+                return rv <  lv;
+        if (strcmp(op, "<=") == 0)
+                return rv <= lv;
+        if (strcmp(op, ">")  == 0)
+                return rv >  lv;
+        if (strcmp(op, ">=") == 0)
+                return rv >= lv;
+    }
+
+    /* ── String fields ── */
+    if (strcmp(field, "category") == 0 || strcmp(field, "inspector") == 0) {
+        const char *rv = (strcmp(field, "category") == 0) ? r->category : r->inspector;
+        int cmp = strcmp(rv, value);
+
+        if (strcmp(op, "==") == 0)
+                return cmp == 0;
+        if (strcmp(op, "!=") == 0)
+                return cmp != 0;
+        /* <, <=, >, >= on strings: not supported – treat as no match */
+    }
+
+    return 0;
 }
-//end of AI implementation
-/*
+//end of AI-assisted implementation
+
 static void cmd_filter(void)
 {
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
+    if (check_access(path, 1, 0) < 0) return;
 
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) { perror("open"); return; }
 
+    Report r; int found = 0;
+    while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r)) {
+        int match = 1;
+        for (int i = 0; i < g_nconds && match; i++) {
+            char field[32], op[4], value[64];
 
-}*/
+            const char *p1 = strchr(g_conds[i], ':');
+            const char *p2 = p1 ? strchr(p1 + 1, ':') : NULL;
+
+            if (!p1 || !p2) {
+                fprintf(stderr, "Bad condition: %s\n", g_conds[i]);
+                match = 0;
+            } else {
+                /* field: de la inceput pana la primul ':' */
+                strncpy(field, g_conds[i], p1 - g_conds[i]);
+                field[p1 - g_conds[i]] = '\0';
+
+                /* op: de la 1 la 2 caractere intre cele doua ':' */
+                int op_len = (int)(p2 - p1 - 1);
+                strncpy(op, p1 + 1, op_len);
+                op[op_len] = '\0';
+
+                /* value: tot ce urmeaza dupa al doilea ':' */
+                strncpy(value, p2 + 1, 63);
+                value[63] = '\0';
+
+                match = match_condition(&r, field, op, value);
+            }
+        }
+        if (match) {
+            char ts[32];
+            { time_t _t = r.timestamp; strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", localtime(&_t)); }
+            printf("ID:%-4u | %-20s | %-12s | Sev:%u | %s\n",
+                   r.id, r.inspector, r.category, r.severity, ts);
+            found++;
+        }
+    }
+    close(fd);
+    if (!found) printf("No reports match the given conditions.\n");
+    log_action("filter");
+}
 
 //Argument parsing
-static void usage(void) 
+static void usage(void)
 {
     fprintf(stderr, "Usage: city_manager --role <manager|inspector> --user <name> --<cmd> [args]\n"
 	  "Commands: --add <d>  --list <d>  --view <d> <id>  --remove_report <d> <id>\n"
         " --update_threshold <d> <val>  --filter <d> [cond ...]\n");
 }
 
-int main(int argc, char *argv[]) 
+int main(int argc, char *argv[])
 {
     int role_set = 0, user_set = 0, op_set = 0;
 
-    for (int i = 1; i < argc; i++) 
+    for (int i = 1; i < argc; i++)
     {
         if      (!strcmp(argv[i],"--role") && i+1<argc)
 	{
@@ -518,23 +579,23 @@ int main(int argc, char *argv[])
 	return 1;
     }
 
-    const char *cmd = g_op + 2;   
-    if (!strcmp(cmd,"add"))   
+    const char *cmd = g_op + 2;
+    if (!strcmp(cmd,"add"))
         cmd_add();
-    else if (!strcmp(cmd,"list"))             
+    else if (!strcmp(cmd,"list"))
         cmd_list();
-    else if (!strcmp(cmd,"view"))         
+    else if (!strcmp(cmd,"view"))
         cmd_view();
-    else if (!strcmp(cmd,"remove_report"))    
+    else if (!strcmp(cmd,"remove_report"))
         cmd_remove_report();
-    else if (!strcmp(cmd,"update_threshold")) 
+    else if (!strcmp(cmd,"update_threshold"))
         cmd_update_threshold();
-    //else if (!strcmp(cmd,"filter"))
-    //  cmd_filter();
-    else 
-    { 
-        fprintf(stderr, "Unknown command: %s\n", g_op); 
-        return 1; 
+    else if (!strcmp(cmd,"filter"))
+        cmd_filter();
+    else
+    {
+        fprintf(stderr, "Unknown command: %s\n", g_op);
+        return 1;
     }
 
     return 0;
