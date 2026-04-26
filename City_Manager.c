@@ -362,6 +362,7 @@ static void cmd_remove_report(void)
     {
         lseek(fd, i * sizeof(r), SEEK_SET);
         read(fd, &r, sizeof(r));
+        r.id = (uint32_t)i;   //renumerotare in caz ca stergem reportul k, toate de dupa k se shifteaza cu 1 in stanga
         lseek(fd, (i - 1) * sizeof(r), SEEK_SET);
         write(fd, &r, sizeof(r));
     }
