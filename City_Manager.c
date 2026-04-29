@@ -536,6 +536,78 @@ static void cmd_filter(void)
     log_action("filter");
 }
 
+///Phase 2 implementation
+static void cmd_remove_district(void)
+{
+    if (strcmp(g_role, "manager") != 0)
+    {
+        fprintf(stderr, "Role required for remove_district: manager\n");
+        return;
+    }
+
+    struct stat st;
+    if (stat(g_district, &st) < 0) {
+        fprintf(stderr, "District %s doesn't exist\n",g_district);
+        return;
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        fprintf(stderr, "District %s is not a directory\n",g_district);
+        return;
+    }
+
+    if (strchr(g_district, '/') || strcmp(g_district, ".") == 0 || strcmp(g_district, "..") == 0)
+    {
+        fprintf(stderr,"Invalid district id '%s': must be a simple directory name.\n", g_district);
+        return;
+    }
+
+    //security measures
+
+    printf("Removing %s district...\n", g_district);
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return;
+    }
+
+    if (pid == 0) {
+        char *args[] = {"rm", "-r", g_district, NULL};
+        execvp("rm", args);
+        //if it doesnt succesfully execute the command
+        perror("execvp");
+        exit(1);
+    }
+
+    int status;
+
+    if ( waitpid(pid,&status,0)<0) {
+        perror("waitpid");
+        return;
+    }
+
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        fprintf(stderr, "District %s has exited with status %d\n",g_district, status);
+        return;
+    }
+
+    //remove of link
+    char link[256];
+    snprintf(link, sizeof(link), "active_reports-%s", g_district);
+
+    struct stat lst;
+    if (lstat(link, &lst) == 0) {
+        if (unlink(link)<0)
+            perror("unlink");
+        else
+            printf("Removed symlink of %s district\n", g_district);
+    }
+
+    printf("District %s removed succesfully\n", g_district);
+}
+//end of Phase 2 implementation
+
 //Argument parsing
 static void usage(void)
 {
@@ -550,42 +622,48 @@ int main(int argc, char *argv[])
 
     for (int i = 1; i < argc; i++)
     {
-        if      (!strcmp(argv[i],"--role") && i+1<argc)
-	{
-	  strcpy(g_role, argv[++i]);
-	  role_set=1;
-	}
+        if (!strcmp(argv[i],"--role") && i+1<argc)
+	    {
+	        strcpy(g_role, argv[++i]);
+	        role_set=1;
+	    }
         else if (!strcmp(argv[i],"--user") && i+1<argc)
-	{
-	  strcpy(g_user, argv[++i]);
-	  user_set=1;
-	}
+	    {
+	        strcpy(g_user, argv[++i]);
+	        user_set=1;
+	    }
         else if ((!strcmp(argv[i],"--add") || !strcmp(argv[i],"--list")) && i+1<argc)
-	{
-            strcpy(g_op, argv[i]);
-	    strcpy(g_district, argv[++i]);
-	    op_set=1;
+	    {
+             strcpy(g_op, argv[i]);
+	         strcpy(g_district, argv[++i]);
+	         op_set=1;
         }
         else if ((!strcmp(argv[i],"--view") || !strcmp(argv[i],"--remove_report")) && i+2<argc)
-	{
+	    {
             strcpy(g_op, argv[i]);
-	    strcpy(g_district, argv[++i]);
+	        strcpy(g_district, argv[++i]);
             strcpy(g_extra, argv[++i]);
-	    op_set=1;
+	        op_set=1;
         }
         else if (!strcmp(argv[i],"--update_threshold") && i+2<argc)
-	{
+	    {
             strcpy(g_op, argv[i]);
-	    strcpy(g_district, argv[++i]);
+	        strcpy(g_district, argv[++i]);
             g_value = atoi(argv[++i]);
-	    op_set=1;
+	        op_set=1;
         }
         else if (!strcmp(argv[i],"--filter") && i+1<argc)
-	{
+	    {
             strcpy(g_op, argv[i]);
-	    strcpy(g_district, argv[++i]);
+	        strcpy(g_district, argv[++i]);
             while (i+1 < argc && argv[i+1][0] != '-')
                 strcpy(g_conds[g_nconds++], argv[++i]);
+            op_set=1;
+        }
+        else if (!strcmp(argv[i],"--remove_district") && i+1<argc)
+        {
+            strcpy(g_op, argv[i]);
+            strcpy(g_district, argv[++i]);
             op_set=1;
         }
     }
@@ -614,6 +692,8 @@ int main(int argc, char *argv[])
         cmd_update_threshold();
     else if (!strcmp(cmd,"filter"))
         cmd_filter();
+    else if (!strcmp(cmd,"remove_district"))
+        cmd_remove_district();
     else
     {
         fprintf(stderr, "Unknown command: %s\n", g_op);
