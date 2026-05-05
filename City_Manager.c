@@ -5,8 +5,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
 #include <time.h>
 #include <stdint.h>
+#include <errno.h>
 
 //Constante
 #define NAME_LEN 32
@@ -15,6 +18,7 @@
 #define REPORTS_FILE "reports.dat"
 #define CONFIG_FILE "district.cfg"
 #define LOG_FILE "logged_district"
+#define MONITOR_PID  ".monitor_pid"
 
 //Report
 typedef struct {
@@ -57,6 +61,61 @@ static void mode_to_str(mode_t m, char out[10])
  Acces Role-based  (manager = owner bits, inspector = group bits).
  Returneaza 0 daca are voie, -1 daca nu.
  */
+
+static void notify_monitor(uint32_t report_id)
+{
+    char logpath[256];
+    snprintf(logpath, sizeof(logpath), "%s/%s", g_district, LOG_FILE);
+
+    char ts[32];
+    time_t now = time(NULL);
+    strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", localtime(&now));
+
+    /* helper: scrie mesaj in log */
+    #define LOG_MSG(fmt, ...) do { \
+    int _lfd = open(logpath, O_WRONLY|O_CREAT|O_APPEND, 0644); \
+    if (_lfd >= 0) { \
+    char _line[256]; \
+    int _n = snprintf(_line, sizeof(_line), fmt, ##__VA_ARGS__); \
+    write(_lfd, _line, _n); \
+    close(_lfd); \
+    } \
+    } while(0)
+
+    int fd = open(MONITOR_PID, O_RDONLY);
+    if (fd < 0) {
+        LOG_MSG("[%s] report #%u: monitor could not be notified (.monitor_pid not found)\n",
+                ts, report_id);
+        return;
+    }
+
+    char pidbuf[32];
+    memset(pidbuf, 0, sizeof(pidbuf));
+    int nr = read(fd, pidbuf, sizeof(pidbuf) - 1);
+    close(fd);
+
+    if (nr <= 0) {
+        LOG_MSG("[%s] report #%u: monitor could not be notified (.monitor_pid is empty)\n",
+                ts, report_id);
+        return;
+    }
+
+    pid_t monitor_pid = (pid_t)atoi(pidbuf);
+    if (monitor_pid <= 0) {
+        LOG_MSG("[%s] report #%u: monitor could not be notified (invalid PID in .monitor_pid)\n",
+                ts, report_id);
+        return;
+    }
+
+    if (kill(monitor_pid, SIGUSR1) < 0) {
+        LOG_MSG("[%s] report #%u: monitor could not be notified (kill(%d,SIGUSR1) failed: %s)\n",
+                ts, report_id, (int)monitor_pid, strerror(errno));
+        return;
+    }
+
+    LOG_MSG("[%s] report #%u: monitor (PID %d) notified via SIGUSR1\n",ts, report_id, (int)monitor_pid);
+    #undef LOG_MSG
+}
 
 static int check_access(const char *path, int need_read, int need_write) {
     struct stat st;
@@ -230,6 +289,9 @@ static void cmd_add(void)
 
     update_symlink();
     log_action("add");
+    //adaugat pentru phase 2
+    notify_monitor(r.id);
+
     printf("Report #%u added to district '%s'.\n", r.id, g_district);
 }
 
@@ -281,8 +343,8 @@ static void cmd_view(void)
 {
     char path[256];
     snprintf(path, sizeof(path), "%s/%s", g_district, REPORTS_FILE);
-    if (check_access(path, 1, 0) < 0) return;
-
+    if (check_access(path, 1, 0) < 0)
+        return;
     uint32_t tid = (uint32_t)strtoul(g_extra, NULL, 10);
     int fd = open(path, O_RDONLY);
     if (fd < 0)
@@ -448,7 +510,6 @@ int parse_condition(const char *input, char *field, char *op, char *value) {
     return 0;
 }
 
-
 int match_condition(Report *r, const char *field, const char *op, const char *value) {
     /* ── Numeric fields ── */
     if (strcmp(field, "severity") == 0 || strcmp(field, "timestamp") == 0) {
@@ -613,7 +674,7 @@ static void usage(void)
 {
     fprintf(stderr, "Usage: city_manager --role <manager|inspector> --user <name> --<cmd> [args]\n"
 	  "Commands: --add <d>  --list <d>  --view <d> <id>  --remove_report <d> <id>\n"
-        " --update_threshold <d> <val>  --filter <d> [cond ...]\n");
+        " --update_threshold <d> <val>  --filter <d> [cond ...]  --remove_district <district_name>\n");
 }
 
 int main(int argc, char *argv[])
