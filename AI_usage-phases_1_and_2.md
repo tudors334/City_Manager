@@ -167,5 +167,6 @@ What I learned using Claude to write these 2 functions:
 I learned that AI is very efficient in writing bits of code that help/complement human developed code and I find it very interesting that it writes large ammounts of code in a very short time making developping large projects much faster.
 
 AI Usage Phase 2:
-The only suggestion the AI made was to add volatile for the monitor_reports g_got_sigusr1 and g_got_sigint variables, because in C the volatile keyword is a qualifier that is applied to a variable when it is declared. It tells the compiler that the value of the variable may change at any time, even without any action being taken by the code the compiler finds nearby. The implications of this are quite serious.
+
+The only 2 suggestions the AI made was to add volatile for the monitor_reports g_got_sigusr1 and g_got_sigint variables, because in C the volatile keyword is a qualifier that is applied to a variable when it is declared, and to use the fflush() function. The "volatile" C reserved word tells the compiler that the value of the variable may change at any time, even without any action being taken by the code the compiler finds nearby. The implications of this are quite serious. As for the fflush() function, in C it is used to immediately flush out the contents of an output stream.
 
